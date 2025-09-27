@@ -49,14 +49,15 @@ class RAGSystem:
             print(f"Error processing course document {file_path}: {e}")
             return None, 0
     
-    def add_course_folder(self, folder_path: str, clear_existing: bool = False) -> Tuple[int, int]:
+    def add_course_folder(self, folder_path: str, clear_existing: bool = False, selected_files: Optional[List[str]] = None) -> Tuple[int, int]:
         """
-        Add all course documents from a folder.
-        
+        Add course documents from a folder.
+
         Args:
             folder_path: Path to folder containing course documents
             clear_existing: Whether to clear existing data first
-            
+            selected_files: Optional list of specific filenames to process. If None, processes all files.
+
         Returns:
             Tuple of (total courses added, total chunks created)
         """
@@ -75,8 +76,16 @@ class RAGSystem:
         # Get existing course titles to avoid re-processing
         existing_course_titles = set(self.vector_store.get_existing_course_titles())
         
-        # Process each file in the folder
-        for file_name in os.listdir(folder_path):
+        # Determine which files to process
+        if selected_files:
+            # Process only selected files
+            files_to_process = [f for f in selected_files if f in os.listdir(folder_path)]
+        else:
+            # Process all files in the folder
+            files_to_process = os.listdir(folder_path)
+
+        # Process each file
+        for file_name in files_to_process:
             file_path = os.path.join(folder_path, file_name)
             if os.path.isfile(file_path) and file_name.lower().endswith(('.pdf', '.docx', '.txt')):
                 try:

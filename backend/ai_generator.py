@@ -1,5 +1,6 @@
 import anthropic
 from typing import List, Optional, Dict, Any
+from anthropic import APIError, AuthenticationError, RateLimitError
 
 class AIGenerator:
     """Handles interactions with Anthropic's Claude API for generating responses"""
@@ -76,15 +77,27 @@ Provide only the direct answer to what was asked.
             api_params["tools"] = tools
             api_params["tool_choice"] = {"type": "auto"}
         
-        # Get response from Claude
-        response = self.client.messages.create(**api_params)
-        
-        # Handle tool execution if needed
-        if response.stop_reason == "tool_use" and tool_manager:
-            return self._handle_tool_execution(response, api_params, tool_manager)
-        
-        # Return direct response
-        return response.content[0].text
+        # Get response from Claude with error handling
+        try:
+            response = self.client.messages.create(**api_params)
+
+            # Handle tool execution if needed
+            if response.stop_reason == "tool_use" and tool_manager:
+                return self._handle_tool_execution(response, api_params, tool_manager)
+
+            # Return direct response
+            return response.content[0].text
+
+        except AuthenticationError:
+            return "Error: Invalid Anthropic API key. Please check your API key configuration."
+        except RateLimitError:
+            return "Error: API rate limit exceeded. Please try again in a moment."
+        except APIError as e:
+            if "credit balance" in str(e).lower():
+                return "Error: Insufficient Anthropic API credits. Please add credits to your Anthropic account to continue using the service."
+            return f"Error: API request failed - {str(e)}"
+        except Exception as e:
+            return f"Error: An unexpected error occurred - {str(e)}"
     
     def _handle_tool_execution(self, initial_response, base_params: Dict[str, Any], tool_manager):
         """
@@ -130,6 +143,17 @@ Provide only the direct answer to what was asked.
             "system": base_params["system"]
         }
         
-        # Get final response
-        final_response = self.client.messages.create(**final_params)
-        return final_response.content[0].text
+        # Get final response with error handling
+        try:
+            final_response = self.client.messages.create(**final_params)
+            return final_response.content[0].text
+        except AuthenticationError:
+            return "Error: Invalid Anthropic API key. Please check your API key configuration."
+        except RateLimitError:
+            return "Error: API rate limit exceeded. Please try again in a moment."
+        except APIError as e:
+            if "credit balance" in str(e).lower():
+                return "Error: Insufficient Anthropic API credits. Please add credits to your Anthropic account to continue using the service."
+            return f"Error: API request failed - {str(e)}"
+        except Exception as e:
+            return f"Error: An unexpected error occurred - {str(e)}"
