@@ -155,14 +155,41 @@ class OllamaProvider(LLMProvider):
                          tools: Optional[List] = None,
                          tool_manager=None) -> str:
 
-        system_prompt = """ You are an AI assistant specialized in course materials and educational content.
+        # Check if we should search course content based on query keywords
+        should_search = self._should_search_courses(query)
+        search_results = ""
+
+        # Perform search if needed and tools are available
+        if should_search and tool_manager:
+            try:
+                search_results = tool_manager.execute_tool("search_course_content", query=query)
+                if search_results and search_results.strip():
+                    search_context = f"\n\nRelevant course content found:\n{search_results}"
+                else:
+                    search_context = "\n\nNo relevant course content found for this query."
+            except Exception as e:
+                search_context = f"\n\nError searching course content: {str(e)}"
+        else:
+            search_context = ""
+
+        system_prompt = f""" You are an AI assistant specialized in course materials and educational content.
+
+Search Tool Usage:
+- When users ask about specific course content, programming concepts, or technical topics that might be covered in educational materials, search the course database first
+- Synthesize search results into accurate, fact-based responses
+- If search yields no results, provide general knowledge answers
+
+Response Protocol:
+- **Course-specific questions**: Use search results when available, supplement with general knowledge
+- **General knowledge questions**: Answer using existing knowledge
+- **No meta-commentary**: Provide direct answers without mentioning search process
 
 All responses must be:
 1. **Brief, Concise and focused** - Get to the point quickly
 2. **Educational** - Maintain instructional value
 3. **Clear** - Use accessible language
 4. **Example-supported** - Include relevant examples when they aid understanding
-Provide only the direct answer to what was asked.
+Provide only the direct answer to what was asked.{search_context}
 """
 
         messages = [{"role": "system", "content": system_prompt}]
@@ -185,6 +212,22 @@ Provide only the direct answer to what was asked.
         except Exception as e:
             return f"Error: Failed to connect to Ollama - {str(e)}. Make sure Ollama is running and the model '{self.model}' is installed."
 
+    def _should_search_courses(self, query: str) -> bool:
+        """Determine if the query likely relates to course content"""
+        query_lower = query.lower()
+
+        # Keywords that suggest course-specific content
+        course_keywords = [
+            'mcp', 'anthropic', 'claude', 'ai', 'api', 'programming', 'code', 'software',
+            'development', 'tutorial', 'lesson', 'course', 'learn', 'how to',
+            'python', 'javascript', 'react', 'vue', 'node', 'express', 'fastapi',
+            'database', 'sql', 'mongodb', 'backend', 'frontend', 'framework',
+            'algorithm', 'data structure', 'machine learning', 'deep learning'
+        ]
+
+        # Check if query contains course-related keywords
+        return any(keyword in query_lower for keyword in course_keywords)
+
 class LocalAIProvider(LLMProvider):
     """LocalAI provider implementation"""
 
@@ -205,14 +248,41 @@ class LocalAIProvider(LLMProvider):
                          tools: Optional[List] = None,
                          tool_manager=None) -> str:
 
-        system_prompt = """ You are an AI assistant specialized in course materials and educational content.
+        # Check if we should search course content based on query keywords
+        should_search = self._should_search_courses(query)
+        search_results = ""
+
+        # Perform search if needed and tools are available
+        if should_search and tool_manager:
+            try:
+                search_results = tool_manager.execute_tool("search_course_content", query=query)
+                if search_results and search_results.strip():
+                    search_context = f"\n\nRelevant course content found:\n{search_results}"
+                else:
+                    search_context = "\n\nNo relevant course content found for this query."
+            except Exception as e:
+                search_context = f"\n\nError searching course content: {str(e)}"
+        else:
+            search_context = ""
+
+        system_prompt = f""" You are an AI assistant specialized in course materials and educational content.
+
+Search Tool Usage:
+- When users ask about specific course content, programming concepts, or technical topics that might be covered in educational materials, search the course database first
+- Synthesize search results into accurate, fact-based responses
+- If search yields no results, provide general knowledge answers
+
+Response Protocol:
+- **Course-specific questions**: Use search results when available, supplement with general knowledge
+- **General knowledge questions**: Answer using existing knowledge
+- **No meta-commentary**: Provide direct answers without mentioning search process
 
 All responses must be:
 1. **Brief, Concise and focused** - Get to the point quickly
 2. **Educational** - Maintain instructional value
 3. **Clear** - Use accessible language
 4. **Example-supported** - Include relevant examples when they aid understanding
-Provide only the direct answer to what was asked.
+Provide only the direct answer to what was asked.{search_context}
 """
 
         messages = [{"role": "system", "content": system_prompt}]
@@ -234,3 +304,19 @@ Provide only the direct answer to what was asked.
 
         except Exception as e:
             return f"Error: Failed to connect to LocalAI - {str(e)}. Make sure LocalAI is running at {self.client.base_url}."
+
+    def _should_search_courses(self, query: str) -> bool:
+        """Determine if the query likely relates to course content"""
+        query_lower = query.lower()
+
+        # Keywords that suggest course-specific content
+        course_keywords = [
+            'mcp', 'anthropic', 'claude', 'ai', 'api', 'programming', 'code', 'software',
+            'development', 'tutorial', 'lesson', 'course', 'learn', 'how to',
+            'python', 'javascript', 'react', 'vue', 'node', 'express', 'fastapi',
+            'database', 'sql', 'mongodb', 'backend', 'frontend', 'framework',
+            'algorithm', 'data structure', 'machine learning', 'deep learning'
+        ]
+
+        # Check if query contains course-related keywords
+        return any(keyword in query_lower for keyword in course_keywords)
