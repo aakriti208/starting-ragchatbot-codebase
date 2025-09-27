@@ -2,7 +2,7 @@ from typing import List, Tuple, Optional, Dict
 import os
 from document_processor import DocumentProcessor
 from vector_store import VectorStore
-from ai_generator import AIGenerator
+from llm_provider import LLMProvider, AnthropicProvider, OllamaProvider, LocalAIProvider
 from session_manager import SessionManager
 from search_tools import ToolManager, CourseSearchTool
 from models import Course, Lesson, CourseChunk
@@ -12,17 +12,30 @@ class RAGSystem:
     
     def __init__(self, config):
         self.config = config
-        
+
         # Initialize core components
         self.document_processor = DocumentProcessor(config.CHUNK_SIZE, config.CHUNK_OVERLAP)
         self.vector_store = VectorStore(config.CHROMA_PATH, config.EMBEDDING_MODEL, config.MAX_RESULTS)
-        self.ai_generator = AIGenerator(config.ANTHROPIC_API_KEY, config.ANTHROPIC_MODEL)
+        self.ai_generator = self._create_llm_provider(config)
         self.session_manager = SessionManager(config.MAX_HISTORY)
-        
+
         # Initialize search tools
         self.tool_manager = ToolManager()
         self.search_tool = CourseSearchTool(self.vector_store)
         self.tool_manager.register_tool(self.search_tool)
+
+    def _create_llm_provider(self, config) -> LLMProvider:
+        """Create the appropriate LLM provider based on configuration"""
+        provider = config.LLM_PROVIDER.lower()
+
+        if provider == "anthropic":
+            return AnthropicProvider(config.ANTHROPIC_API_KEY, config.ANTHROPIC_MODEL)
+        elif provider == "ollama":
+            return OllamaProvider(config.OLLAMA_BASE_URL, config.OLLAMA_MODEL)
+        elif provider == "localai":
+            return LocalAIProvider(config.LOCALAI_BASE_URL, config.LOCALAI_MODEL)
+        else:
+            raise ValueError(f"Unsupported LLM provider: {provider}. Supported providers: anthropic, ollama, localai")
     
     def add_course_document(self, file_path: str) -> Tuple[Course, int]:
         """
