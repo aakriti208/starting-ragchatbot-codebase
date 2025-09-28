@@ -113,6 +113,87 @@ class CourseSearchTool(Tool):
         
         return "\n\n".join(formatted)
 
+
+class CourseOutlineTool(Tool):
+    """Tool for getting course outlines including all lessons"""
+
+    def __init__(self, vector_store: VectorStore):
+        self.store = vector_store
+
+    def get_tool_definition(self) -> Dict[str, Any]:
+        """Return Anthropic tool definition for this tool"""
+        return {
+            "name": "get_course_outline",
+            "description": "Get course outline including course title, course link, and complete lesson list with titles",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "course_name": {
+                        "type": "string",
+                        "description": "Course title or partial course name to get outline for"
+                    }
+                },
+                "required": ["course_name"]
+            }
+        }
+
+    def execute(self, course_name: str) -> str:
+        """
+        Execute the outline tool to get course structure.
+
+        Args:
+            course_name: Course name to get outline for
+
+        Returns:
+            Formatted course outline or error message
+        """
+        # First resolve the course name using the same approach as content search
+        resolved_course_title = self.store._resolve_course_name(course_name)
+
+        if not resolved_course_title:
+            return f"No course found matching '{course_name}'"
+
+        # Get all courses metadata to find the specific course
+        all_courses = self.store.get_all_courses_metadata()
+
+        target_course = None
+        for course in all_courses:
+            if course.get('title') == resolved_course_title:
+                target_course = course
+                break
+
+        if not target_course:
+            return f"Course outline not available for '{course_name}'"
+
+        # Format the outline
+        return self._format_outline(target_course)
+
+    def _format_outline(self, course_metadata: Dict[str, Any]) -> str:
+        """Format course outline with title, link, and lessons"""
+        title = course_metadata.get('title', 'Unknown Course')
+        course_link = course_metadata.get('course_link', 'No link available')
+        instructor = course_metadata.get('instructor', 'Unknown Instructor')
+        lessons = course_metadata.get('lessons', [])
+
+        # Build the outline
+        outline = [f"**Course:** {title}"]
+        outline.append(f"**Instructor:** {instructor}")
+        outline.append(f"**Course Link:** {course_link}")
+        outline.append(f"**Total Lessons:** {len(lessons)}")
+        outline.append("")
+        outline.append("**Lesson Outline:**")
+
+        if not lessons:
+            outline.append("No lessons available")
+        else:
+            for lesson in lessons:
+                lesson_num = lesson.get('lesson_number', 'N/A')
+                lesson_title = lesson.get('lesson_title', 'Untitled Lesson')
+                outline.append(f"Lesson {lesson_num}: {lesson_title}")
+
+        return "\n".join(outline)
+
+
 class ToolManager:
     """Manages available tools for the AI"""
     
