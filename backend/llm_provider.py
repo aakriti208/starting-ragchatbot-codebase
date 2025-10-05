@@ -162,7 +162,11 @@ class OllamaProvider(LLMProvider):
         # Perform search if needed and tools are available
         if should_search and tool_manager:
             try:
-                search_results = tool_manager.execute_tool("search_course_content", query=query)
+                # Extract parameters from the query
+                search_params = self._extract_search_parameters(query)
+
+                # Execute search with extracted parameters
+                search_results = tool_manager.execute_tool("search_course_content", **search_params)
                 if search_results and search_results.strip():
                     search_context = f"\n\nRelevant course content found:\n{search_results}"
                 else:
@@ -214,19 +218,93 @@ Provide only the direct answer to what was asked.{search_context}
 
     def _should_search_courses(self, query: str) -> bool:
         """Determine if the query likely relates to course content"""
+        import re
+
         query_lower = query.lower()
 
-        # Keywords that suggest course-specific content
-        course_keywords = [
-            'mcp', 'anthropic', 'claude', 'ai', 'api', 'programming', 'code', 'software',
-            'development', 'tutorial', 'lesson', 'course', 'learn', 'how to',
-            'python', 'javascript', 'react', 'vue', 'node', 'express', 'fastapi',
-            'database', 'sql', 'mongodb', 'backend', 'frontend', 'framework',
-            'algorithm', 'data structure', 'machine learning', 'deep learning'
+        # Strong indicators - always search
+        strong_patterns = [
+            r'\bcourse\b', r'\blesson\b', r'\btutorial\b', r'\bmodule\b',
+            r'\bMCP\b', r'\bClaude\b', r'\bAnthropic\b'
         ]
 
-        # Check if query contains course-related keywords
-        return any(keyword in query_lower for keyword in course_keywords)
+        if any(re.search(pattern, query, re.IGNORECASE) for pattern in strong_patterns):
+            return True
+
+        # Educational question patterns
+        educational_patterns = [
+            'how to', 'what is', 'what are', 'explain', 'learn', 'teach',
+            'show me', 'tell me about', 'describe'
+        ]
+
+        # Technical keywords
+        tech_keywords = [
+            'api', 'programming', 'code', 'software', 'development',
+            'python', 'javascript', 'database', 'ml', 'ai'
+        ]
+
+        # Search if educational pattern + tech keyword
+        has_educational = any(pattern in query_lower for pattern in educational_patterns)
+        has_tech = any(keyword in query_lower for keyword in tech_keywords)
+
+        return has_educational and has_tech
+
+    def _extract_search_parameters(self, query: str) -> Dict[str, Any]:
+        """Extract search parameters from the query using regex patterns"""
+        import re
+
+        params = {"query": query}
+
+        # Extract lesson number using regex
+        # Patterns: "lesson 1", "lesson 2", "in lesson 3", etc.
+        lesson_patterns = [
+            r'\blesson\s+(\d+)\b',
+            r'\bin\s+lesson\s+(\d+)\b',
+            r'\bof\s+lesson\s+(\d+)\b'
+        ]
+
+        for pattern in lesson_patterns:
+            match = re.search(pattern, query, re.IGNORECASE)
+            if match:
+                params["lesson_number"] = int(match.group(1))
+                break
+
+        # Extract course name using pattern matching
+        # Patterns: "in the X course", "from X course", "about X course", etc.
+        course_patterns = [
+            r'in\s+(?:the\s+)?([^?]+?)\s+course',
+            r'from\s+(?:the\s+)?([^?]+?)\s+course',
+            r'about\s+(?:the\s+)?([^?]+?)\s+course',
+            r'of\s+(?:the\s+)?([^?]+?)\s+course'
+        ]
+
+        for pattern in course_patterns:
+            match = re.search(pattern, query, re.IGNORECASE)
+            if match:
+                course_name = match.group(1).strip()
+                # Clean up common words
+                course_name = re.sub(r'\s+(is|are|was|were)\s*$', '', course_name, flags=re.IGNORECASE)
+                params["course_name"] = course_name
+                break
+
+        # If no explicit course pattern, check for course names directly
+        if "course_name" not in params:
+            # Check for common course identifiers
+            course_identifiers = [
+                r'\bMCP\b',
+                r'\bIntroduction\s+to\s+MCP\b',
+                r'\bAnthropic\b',
+                r'\bClaude\b',
+                r'\bBuilding\s+with\s+\w+\b'
+            ]
+
+            for pattern in course_identifiers:
+                match = re.search(pattern, query, re.IGNORECASE)
+                if match:
+                    params["course_name"] = match.group(0)
+                    break
+
+        return params
 
 class LocalAIProvider(LLMProvider):
     """LocalAI provider implementation"""
@@ -255,7 +333,11 @@ class LocalAIProvider(LLMProvider):
         # Perform search if needed and tools are available
         if should_search and tool_manager:
             try:
-                search_results = tool_manager.execute_tool("search_course_content", query=query)
+                # Extract parameters from the query
+                search_params = self._extract_search_parameters(query)
+
+                # Execute search with extracted parameters
+                search_results = tool_manager.execute_tool("search_course_content", **search_params)
                 if search_results and search_results.strip():
                     search_context = f"\n\nRelevant course content found:\n{search_results}"
                 else:
@@ -307,16 +389,90 @@ Provide only the direct answer to what was asked.{search_context}
 
     def _should_search_courses(self, query: str) -> bool:
         """Determine if the query likely relates to course content"""
+        import re
+
         query_lower = query.lower()
 
-        # Keywords that suggest course-specific content
-        course_keywords = [
-            'mcp', 'anthropic', 'claude', 'ai', 'api', 'programming', 'code', 'software',
-            'development', 'tutorial', 'lesson', 'course', 'learn', 'how to',
-            'python', 'javascript', 'react', 'vue', 'node', 'express', 'fastapi',
-            'database', 'sql', 'mongodb', 'backend', 'frontend', 'framework',
-            'algorithm', 'data structure', 'machine learning', 'deep learning'
+        # Strong indicators - always search
+        strong_patterns = [
+            r'\bcourse\b', r'\blesson\b', r'\btutorial\b', r'\bmodule\b',
+            r'\bMCP\b', r'\bClaude\b', r'\bAnthropic\b'
         ]
 
-        # Check if query contains course-related keywords
-        return any(keyword in query_lower for keyword in course_keywords)
+        if any(re.search(pattern, query, re.IGNORECASE) for pattern in strong_patterns):
+            return True
+
+        # Educational question patterns
+        educational_patterns = [
+            'how to', 'what is', 'what are', 'explain', 'learn', 'teach',
+            'show me', 'tell me about', 'describe'
+        ]
+
+        # Technical keywords
+        tech_keywords = [
+            'api', 'programming', 'code', 'software', 'development',
+            'python', 'javascript', 'database', 'ml', 'ai'
+        ]
+
+        # Search if educational pattern + tech keyword
+        has_educational = any(pattern in query_lower for pattern in educational_patterns)
+        has_tech = any(keyword in query_lower for keyword in tech_keywords)
+
+        return has_educational and has_tech
+
+    def _extract_search_parameters(self, query: str) -> Dict[str, Any]:
+        """Extract search parameters from the query using regex patterns"""
+        import re
+
+        params = {"query": query}
+
+        # Extract lesson number using regex
+        # Patterns: "lesson 1", "lesson 2", "in lesson 3", etc.
+        lesson_patterns = [
+            r'\blesson\s+(\d+)\b',
+            r'\bin\s+lesson\s+(\d+)\b',
+            r'\bof\s+lesson\s+(\d+)\b'
+        ]
+
+        for pattern in lesson_patterns:
+            match = re.search(pattern, query, re.IGNORECASE)
+            if match:
+                params["lesson_number"] = int(match.group(1))
+                break
+
+        # Extract course name using pattern matching
+        # Patterns: "in the X course", "from X course", "about X course", etc.
+        course_patterns = [
+            r'in\s+(?:the\s+)?([^?]+?)\s+course',
+            r'from\s+(?:the\s+)?([^?]+?)\s+course',
+            r'about\s+(?:the\s+)?([^?]+?)\s+course',
+            r'of\s+(?:the\s+)?([^?]+?)\s+course'
+        ]
+
+        for pattern in course_patterns:
+            match = re.search(pattern, query, re.IGNORECASE)
+            if match:
+                course_name = match.group(1).strip()
+                # Clean up common words
+                course_name = re.sub(r'\s+(is|are|was|were)\s*$', '', course_name, flags=re.IGNORECASE)
+                params["course_name"] = course_name
+                break
+
+        # If no explicit course pattern, check for course names directly
+        if "course_name" not in params:
+            # Check for common course identifiers
+            course_identifiers = [
+                r'\bMCP\b',
+                r'\bIntroduction\s+to\s+MCP\b',
+                r'\bAnthropic\b',
+                r'\bClaude\b',
+                r'\bBuilding\s+with\s+\w+\b'
+            ]
+
+            for pattern in course_identifiers:
+                match = re.search(pattern, query, re.IGNORECASE)
+                if match:
+                    params["course_name"] = match.group(0)
+                    break
+
+        return params
