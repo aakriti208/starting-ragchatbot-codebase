@@ -6,10 +6,13 @@ import tempfile
 import shutil
 from pathlib import Path
 from typing import List
+from unittest.mock import Mock, patch
 
 from models import Course, Lesson, CourseChunk
 from vector_store import VectorStore
 from search_tools import ToolManager, CourseSearchTool, CourseOutlineTool
+from config import Config
+from rag_system import RAGSystem
 
 
 @pytest.fixture
@@ -167,3 +170,43 @@ def mock_anthropic_response():
                 self.stop_reason = stop_reason
 
     return MockResponse
+
+
+@pytest.fixture
+def test_config():
+    """Create a test configuration with temporary directories"""
+    config = Config()
+    config.CHUNK_SIZE = 800
+    config.CHUNK_OVERLAP = 100
+    config.MAX_RESULTS = 5
+    config.MAX_HISTORY = 10
+    config.CHROMA_PATH = tempfile.mkdtemp()
+    config.EMBEDDING_MODEL = "all-MiniLM-L6-v2"
+    config.LLM_PROVIDER = "ollama"
+    config.OLLAMA_BASE_URL = "http://localhost:11434"
+    config.OLLAMA_MODEL = "llama3.2"
+
+    yield config
+
+    # Cleanup
+    shutil.rmtree(config.CHROMA_PATH, ignore_errors=True)
+
+
+@pytest.fixture
+def mock_rag_system(test_config, sample_course, sample_course_chunks):
+    """Create a mocked RAG system for API testing"""
+    with patch('openai.OpenAI') as mock_openai:
+        # Mock the OpenAI client
+        mock_client = Mock()
+        mock_response = Mock()
+        mock_response.choices = [Mock(message=Mock(content="Test response from RAG system"))]
+        mock_client.chat.completions.create.return_value = mock_response
+        mock_openai.return_value = mock_client
+
+        system = RAGSystem(test_config)
+
+        # Add test data
+        system.vector_store.add_course_metadata(sample_course)
+        system.vector_store.add_course_content(sample_course_chunks)
+
+        yield system
