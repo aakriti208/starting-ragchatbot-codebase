@@ -1,8 +1,9 @@
 """
 Tests for CourseSearchTool and CourseOutlineTool to verify search functionality
 """
+
 import pytest
-from search_tools import CourseSearchTool, CourseOutlineTool, ToolManager
+from search_tools import CourseOutlineTool, CourseSearchTool, ToolManager
 
 
 class TestCourseSearchTool:
@@ -35,8 +36,7 @@ class TestCourseSearchTool:
     def test_execute_with_course_filter(self, search_tool):
         """Test search with course_name filter"""
         result = search_tool.execute(
-            query="protocol",
-            course_name="Introduction to MCP"
+            query="protocol", course_name="Introduction to MCP"
         )
 
         assert isinstance(result, str)
@@ -48,7 +48,7 @@ class TestCourseSearchTool:
         """Test that partial course names work via semantic matching"""
         result = search_tool.execute(
             query="What are tools?",
-            course_name="MCP"  # Partial match for "Introduction to MCP"
+            course_name="MCP",  # Partial match for "Introduction to MCP"
         )
 
         assert isinstance(result, str)
@@ -61,7 +61,7 @@ class TestCourseSearchTool:
         result = search_tool.execute(
             query="tools and resources",
             course_name="Introduction to MCP",
-            lesson_number=1
+            lesson_number=1,
         )
 
         assert isinstance(result, str)
@@ -70,10 +70,7 @@ class TestCourseSearchTool:
 
     def test_execute_with_nonexistent_course(self, search_tool):
         """Test search with non-existent course name"""
-        result = search_tool.execute(
-            query="test",
-            course_name="Nonexistent Course"
-        )
+        result = search_tool.execute(query="test", course_name="Nonexistent Course")
 
         assert isinstance(result, str)
         # Should return error message about course not found
@@ -85,21 +82,22 @@ class TestCourseSearchTool:
         search_tool.last_sources = []
 
         result = search_tool.execute(
-            query="What is MCP?",
-            course_name="Introduction to MCP"
+            query="What is MCP?", course_name="Introduction to MCP"
         )
 
         # Check that sources were tracked
         assert len(search_tool.last_sources) > 0
         # Sources should contain course title
-        assert any("Introduction to MCP" in source for source in search_tool.last_sources)
+        assert any(
+            "Introduction to MCP" in source for source in search_tool.last_sources
+        )
 
     def test_execute_empty_results(self, search_tool):
         """Test behavior when no results are found"""
         result = search_tool.execute(
             query="quantum physics advanced equations",  # Unlikely to match course content
             course_name="Introduction to MCP",
-            lesson_number=0
+            lesson_number=0,
         )
 
         assert isinstance(result, str)
@@ -177,8 +175,7 @@ class TestToolManager:
     def test_execute_tool_by_name(self, tool_manager):
         """Test executing a tool by name"""
         result = tool_manager.execute_tool(
-            "search_course_content",
-            query="What is MCP?"
+            "search_course_content", query="What is MCP?"
         )
 
         assert isinstance(result, str)
@@ -186,10 +183,7 @@ class TestToolManager:
 
     def test_execute_nonexistent_tool(self, tool_manager):
         """Test executing a non-existent tool"""
-        result = tool_manager.execute_tool(
-            "nonexistent_tool",
-            query="test"
-        )
+        result = tool_manager.execute_tool("nonexistent_tool", query="test")
 
         assert "not found" in result.lower()
 
@@ -199,7 +193,7 @@ class TestToolManager:
         tool_manager.execute_tool(
             "search_course_content",
             query="MCP protocol",
-            course_name="Introduction to MCP"
+            course_name="Introduction to MCP",
         )
 
         sources = tool_manager.get_last_sources()
@@ -209,10 +203,7 @@ class TestToolManager:
     def test_reset_sources(self, tool_manager):
         """Test resetting sources"""
         # Execute a search to generate sources
-        tool_manager.execute_tool(
-            "search_course_content",
-            query="MCP"
-        )
+        tool_manager.execute_tool("search_course_content", query="MCP")
 
         # Verify sources exist
         assert len(tool_manager.get_last_sources()) > 0

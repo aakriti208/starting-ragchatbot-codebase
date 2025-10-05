@@ -1,15 +1,16 @@
 """
 Shared test fixtures and configuration for RAG system tests
 """
-import pytest
-import tempfile
+
 import shutil
+import tempfile
 from pathlib import Path
 from typing import List
 
-from models import Course, Lesson, CourseChunk
+import pytest
+from models import Course, CourseChunk, Lesson
+from search_tools import CourseOutlineTool, CourseSearchTool, ToolManager
 from vector_store import VectorStore
-from search_tools import ToolManager, CourseSearchTool, CourseOutlineTool
 
 
 @pytest.fixture
@@ -28,10 +29,22 @@ def sample_course():
         course_link="https://example.com/mcp-course",
         instructor="John Doe",
         lessons=[
-            Lesson(lesson_number=0, title="Getting Started", lesson_link="https://example.com/lesson0"),
-            Lesson(lesson_number=1, title="Basic Concepts", lesson_link="https://example.com/lesson1"),
-            Lesson(lesson_number=2, title="Advanced Topics", lesson_link="https://example.com/lesson2")
-        ]
+            Lesson(
+                lesson_number=0,
+                title="Getting Started",
+                lesson_link="https://example.com/lesson0",
+            ),
+            Lesson(
+                lesson_number=1,
+                title="Basic Concepts",
+                lesson_link="https://example.com/lesson1",
+            ),
+            Lesson(
+                lesson_number=2,
+                title="Advanced Topics",
+                lesson_link="https://example.com/lesson2",
+            ),
+        ],
     )
 
 
@@ -43,32 +56,32 @@ def sample_course_chunks(sample_course):
             content="MCP stands for Model Context Protocol. It's a standardized way to connect AI models to external data sources.",
             course_title=sample_course.title,
             lesson_number=0,
-            chunk_index=0
+            chunk_index=0,
         ),
         CourseChunk(
             content="The Model Context Protocol enables AI assistants to securely access data from various sources like databases, APIs, and file systems.",
             course_title=sample_course.title,
             lesson_number=0,
-            chunk_index=1
+            chunk_index=1,
         ),
         CourseChunk(
             content="MCP servers provide tools and resources that AI models can use. A tool is a function that the model can call to perform actions.",
             course_title=sample_course.title,
             lesson_number=1,
-            chunk_index=2
+            chunk_index=2,
         ),
         CourseChunk(
             content="Resources in MCP represent data that the model can read. They are similar to files or database records.",
             course_title=sample_course.title,
             lesson_number=1,
-            chunk_index=3
+            chunk_index=3,
         ),
         CourseChunk(
             content="Advanced MCP features include streaming, pagination, and error handling for robust integrations.",
             course_title=sample_course.title,
             lesson_number=2,
-            chunk_index=4
-        )
+            chunk_index=4,
+        ),
     ]
 
 
@@ -80,9 +93,17 @@ def second_sample_course():
         course_link="https://example.com/claude-course",
         instructor="Jane Smith",
         lessons=[
-            Lesson(lesson_number=0, title="Introduction to Claude", lesson_link="https://example.com/claude-lesson0"),
-            Lesson(lesson_number=1, title="Prompt Engineering", lesson_link="https://example.com/claude-lesson1")
-        ]
+            Lesson(
+                lesson_number=0,
+                title="Introduction to Claude",
+                lesson_link="https://example.com/claude-lesson0",
+            ),
+            Lesson(
+                lesson_number=1,
+                title="Prompt Engineering",
+                lesson_link="https://example.com/claude-lesson1",
+            ),
+        ],
     )
 
 
@@ -94,24 +115,28 @@ def second_course_chunks(second_sample_course):
             content="Claude is Anthropic's AI assistant. It's designed to be helpful, harmless, and honest.",
             course_title=second_sample_course.title,
             lesson_number=0,
-            chunk_index=0
+            chunk_index=0,
         ),
         CourseChunk(
             content="Effective prompt engineering with Claude involves clear instructions, examples, and structured thinking.",
             course_title=second_sample_course.title,
             lesson_number=1,
-            chunk_index=1
-        )
+            chunk_index=1,
+        ),
     ]
 
 
 @pytest.fixture
-def vector_store(temp_chroma_dir, sample_course, sample_course_chunks, second_sample_course, second_course_chunks):
+def vector_store(
+    temp_chroma_dir,
+    sample_course,
+    sample_course_chunks,
+    second_sample_course,
+    second_course_chunks,
+):
     """Create a vector store with sample data"""
     store = VectorStore(
-        chroma_path=temp_chroma_dir,
-        embedding_model="all-MiniLM-L6-v2",
-        max_results=5
+        chroma_path=temp_chroma_dir, embedding_model="all-MiniLM-L6-v2", max_results=5
     )
 
     # Add first course
@@ -149,6 +174,7 @@ def tool_manager(search_tool, outline_tool):
 @pytest.fixture
 def mock_anthropic_response():
     """Mock response from Anthropic API"""
+
     class MockContent:
         def __init__(self, text=None, tool_name=None, tool_input=None, tool_id=None):
             self.text = text
@@ -160,7 +186,13 @@ def mock_anthropic_response():
     class MockResponse:
         def __init__(self, text=None, stop_reason="end_turn", tool_use=None):
             if tool_use:
-                self.content = [MockContent(tool_name=tool_use["name"], tool_input=tool_use["input"], tool_id=tool_use.get("id", "tool_123"))]
+                self.content = [
+                    MockContent(
+                        tool_name=tool_use["name"],
+                        tool_input=tool_use["input"],
+                        tool_id=tool_use.get("id", "tool_123"),
+                    )
+                ]
                 self.stop_reason = "tool_use"
             else:
                 self.content = [MockContent(text=text)]
