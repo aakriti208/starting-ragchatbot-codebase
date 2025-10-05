@@ -1,16 +1,21 @@
 from abc import ABC, abstractmethod
-from typing import List, Optional, Dict, Any
+from typing import Any, Dict, List, Optional
+
 
 class LLMProvider(ABC):
     """Abstract base class for LLM providers"""
 
     @abstractmethod
-    def generate_response(self, query: str,
-                         conversation_history: Optional[str] = None,
-                         tools: Optional[List] = None,
-                         tool_manager=None) -> str:
+    def generate_response(
+        self,
+        query: str,
+        conversation_history: Optional[str] = None,
+        tools: Optional[List] = None,
+        tool_manager=None,
+    ) -> str:
         """Generate response from the LLM"""
         pass
+
 
 class AnthropicProvider(LLMProvider):
     """Anthropic Claude provider implementation"""
@@ -21,19 +26,18 @@ class AnthropicProvider(LLMProvider):
 
         self.client = anthropic.Anthropic(api_key=api_key)
         self.model = model
-        self.base_params = {
-            "model": self.model,
-            "temperature": 0,
-            "max_tokens": 800
-        }
+        self.base_params = {"model": self.model, "temperature": 0, "max_tokens": 800}
         self.APIError = APIError
         self.AuthenticationError = AuthenticationError
         self.RateLimitError = RateLimitError
 
-    def generate_response(self, query: str,
-                         conversation_history: Optional[str] = None,
-                         tools: Optional[List] = None,
-                         tool_manager=None) -> str:
+    def generate_response(
+        self,
+        query: str,
+        conversation_history: Optional[str] = None,
+        tools: Optional[List] = None,
+        tool_manager=None,
+    ) -> str:
 
         system_prompt = """ You are an AI assistant specialized in course materials and educational content with access to a comprehensive search tool for course information.
 
@@ -68,7 +72,7 @@ Provide only the direct answer to what was asked.
         api_params = {
             **self.base_params,
             "messages": [{"role": "user", "content": query}],
-            "system": system_content
+            "system": system_content,
         }
 
         if tools:
@@ -94,7 +98,9 @@ Provide only the direct answer to what was asked.
         except Exception as e:
             return f"Error: An unexpected error occurred - {str(e)}"
 
-    def _handle_tool_execution(self, initial_response, base_params: Dict[str, Any], tool_manager):
+    def _handle_tool_execution(
+        self, initial_response, base_params: Dict[str, Any], tool_manager
+    ):
         messages = base_params["messages"].copy()
         messages.append({"role": "assistant", "content": initial_response.content})
 
@@ -102,15 +108,16 @@ Provide only the direct answer to what was asked.
         for content_block in initial_response.content:
             if content_block.type == "tool_use":
                 tool_result = tool_manager.execute_tool(
-                    content_block.name,
-                    **content_block.input
+                    content_block.name, **content_block.input
                 )
 
-                tool_results.append({
-                    "type": "tool_result",
-                    "tool_use_id": content_block.id,
-                    "content": tool_result
-                })
+                tool_results.append(
+                    {
+                        "type": "tool_result",
+                        "tool_use_id": content_block.id,
+                        "content": tool_result,
+                    }
+                )
 
         if tool_results:
             messages.append({"role": "user", "content": tool_results})
@@ -118,7 +125,7 @@ Provide only the direct answer to what was asked.
         final_params = {
             **self.base_params,
             "messages": messages,
-            "system": base_params["system"]
+            "system": base_params["system"],
         }
 
         try:
@@ -135,25 +142,33 @@ Provide only the direct answer to what was asked.
         except Exception as e:
             return f"Error: An unexpected error occurred - {str(e)}"
 
+
 class OllamaProvider(LLMProvider):
     """Local Ollama provider implementation using OpenAI-compatible API"""
 
-    def __init__(self, base_url: str = "http://localhost:11434", model: str = "llama3.2"):
+    def __init__(
+        self, base_url: str = "http://localhost:11434", model: str = "llama3.2"
+    ):
         try:
             from openai import OpenAI
         except ImportError:
-            raise ImportError("OpenAI package required for Ollama provider. Install with: uv add openai")
+            raise ImportError(
+                "OpenAI package required for Ollama provider. Install with: uv add openai"
+            )
 
         self.client = OpenAI(
             base_url=f"{base_url}/v1",
-            api_key="ollama"  # Ollama doesn't require real API key
+            api_key="ollama",  # Ollama doesn't require real API key
         )
         self.model = model
 
-    def generate_response(self, query: str,
-                         conversation_history: Optional[str] = None,
-                         tools: Optional[List] = None,
-                         tool_manager=None) -> str:
+    def generate_response(
+        self,
+        query: str,
+        conversation_history: Optional[str] = None,
+        tools: Optional[List] = None,
+        tool_manager=None,
+    ) -> str:
 
         # Check if we should search course content based on query keywords
         should_search = self._should_search_courses(query)
@@ -166,11 +181,17 @@ class OllamaProvider(LLMProvider):
                 search_params = self._extract_search_parameters(query)
 
                 # Execute search with extracted parameters
-                search_results = tool_manager.execute_tool("search_course_content", **search_params)
+                search_results = tool_manager.execute_tool(
+                    "search_course_content", **search_params
+                )
                 if search_results and search_results.strip():
-                    search_context = f"\n\nRelevant course content found:\n{search_results}"
+                    search_context = (
+                        f"\n\nRelevant course content found:\n{search_results}"
+                    )
                 else:
-                    search_context = "\n\nNo relevant course content found for this query."
+                    search_context = (
+                        "\n\nNo relevant course content found for this query."
+                    )
             except Exception as e:
                 search_context = f"\n\nError searching course content: {str(e)}"
         else:
@@ -199,16 +220,18 @@ Provide only the direct answer to what was asked.{search_context}
         messages = [{"role": "system", "content": system_prompt}]
 
         if conversation_history:
-            messages.append({"role": "assistant", "content": f"Previous conversation:\n{conversation_history}"})
+            messages.append(
+                {
+                    "role": "assistant",
+                    "content": f"Previous conversation:\n{conversation_history}",
+                }
+            )
 
         messages.append({"role": "user", "content": query})
 
         try:
             response = self.client.chat.completions.create(
-                model=self.model,
-                messages=messages,
-                temperature=0,
-                max_tokens=800
+                model=self.model, messages=messages, temperature=0, max_tokens=800
             )
 
             return response.choices[0].message.content
@@ -224,8 +247,13 @@ Provide only the direct answer to what was asked.{search_context}
 
         # Strong indicators - always search
         strong_patterns = [
-            r'\bcourse\b', r'\blesson\b', r'\btutorial\b', r'\bmodule\b',
-            r'\bMCP\b', r'\bClaude\b', r'\bAnthropic\b'
+            r"\bcourse\b",
+            r"\blesson\b",
+            r"\btutorial\b",
+            r"\bmodule\b",
+            r"\bMCP\b",
+            r"\bClaude\b",
+            r"\bAnthropic\b",
         ]
 
         if any(re.search(pattern, query, re.IGNORECASE) for pattern in strong_patterns):
@@ -233,18 +261,35 @@ Provide only the direct answer to what was asked.{search_context}
 
         # Educational question patterns
         educational_patterns = [
-            'how to', 'what is', 'what are', 'explain', 'learn', 'teach',
-            'show me', 'tell me about', 'describe'
+            "how to",
+            "what is",
+            "what are",
+            "explain",
+            "learn",
+            "teach",
+            "show me",
+            "tell me about",
+            "describe",
         ]
 
         # Technical keywords
         tech_keywords = [
-            'api', 'programming', 'code', 'software', 'development',
-            'python', 'javascript', 'database', 'ml', 'ai'
+            "api",
+            "programming",
+            "code",
+            "software",
+            "development",
+            "python",
+            "javascript",
+            "database",
+            "ml",
+            "ai",
         ]
 
         # Search if educational pattern + tech keyword
-        has_educational = any(pattern in query_lower for pattern in educational_patterns)
+        has_educational = any(
+            pattern in query_lower for pattern in educational_patterns
+        )
         has_tech = any(keyword in query_lower for keyword in tech_keywords)
 
         return has_educational and has_tech
@@ -258,9 +303,9 @@ Provide only the direct answer to what was asked.{search_context}
         # Extract lesson number using regex
         # Patterns: "lesson 1", "lesson 2", "in lesson 3", etc.
         lesson_patterns = [
-            r'\blesson\s+(\d+)\b',
-            r'\bin\s+lesson\s+(\d+)\b',
-            r'\bof\s+lesson\s+(\d+)\b'
+            r"\blesson\s+(\d+)\b",
+            r"\bin\s+lesson\s+(\d+)\b",
+            r"\bof\s+lesson\s+(\d+)\b",
         ]
 
         for pattern in lesson_patterns:
@@ -272,10 +317,10 @@ Provide only the direct answer to what was asked.{search_context}
         # Extract course name using pattern matching
         # Patterns: "in the X course", "from X course", "about X course", etc.
         course_patterns = [
-            r'in\s+(?:the\s+)?([^?]+?)\s+course',
-            r'from\s+(?:the\s+)?([^?]+?)\s+course',
-            r'about\s+(?:the\s+)?([^?]+?)\s+course',
-            r'of\s+(?:the\s+)?([^?]+?)\s+course'
+            r"in\s+(?:the\s+)?([^?]+?)\s+course",
+            r"from\s+(?:the\s+)?([^?]+?)\s+course",
+            r"about\s+(?:the\s+)?([^?]+?)\s+course",
+            r"of\s+(?:the\s+)?([^?]+?)\s+course",
         ]
 
         for pattern in course_patterns:
@@ -283,7 +328,9 @@ Provide only the direct answer to what was asked.{search_context}
             if match:
                 course_name = match.group(1).strip()
                 # Clean up common words
-                course_name = re.sub(r'\s+(is|are|was|were)\s*$', '', course_name, flags=re.IGNORECASE)
+                course_name = re.sub(
+                    r"\s+(is|are|was|were)\s*$", "", course_name, flags=re.IGNORECASE
+                )
                 params["course_name"] = course_name
                 break
 
@@ -291,11 +338,11 @@ Provide only the direct answer to what was asked.{search_context}
         if "course_name" not in params:
             # Check for common course identifiers
             course_identifiers = [
-                r'\bMCP\b',
-                r'\bIntroduction\s+to\s+MCP\b',
-                r'\bAnthropic\b',
-                r'\bClaude\b',
-                r'\bBuilding\s+with\s+\w+\b'
+                r"\bMCP\b",
+                r"\bIntroduction\s+to\s+MCP\b",
+                r"\bAnthropic\b",
+                r"\bClaude\b",
+                r"\bBuilding\s+with\s+\w+\b",
             ]
 
             for pattern in course_identifiers:
@@ -306,25 +353,33 @@ Provide only the direct answer to what was asked.{search_context}
 
         return params
 
+
 class LocalAIProvider(LLMProvider):
     """LocalAI provider implementation"""
 
-    def __init__(self, base_url: str = "http://localhost:8080", model: str = "gpt-3.5-turbo"):
+    def __init__(
+        self, base_url: str = "http://localhost:8080", model: str = "gpt-3.5-turbo"
+    ):
         try:
             from openai import OpenAI
         except ImportError:
-            raise ImportError("OpenAI package required for LocalAI provider. Install with: uv add openai")
+            raise ImportError(
+                "OpenAI package required for LocalAI provider. Install with: uv add openai"
+            )
 
         self.client = OpenAI(
             base_url=f"{base_url}/v1",
-            api_key="local"  # LocalAI doesn't require real API key
+            api_key="local",  # LocalAI doesn't require real API key
         )
         self.model = model
 
-    def generate_response(self, query: str,
-                         conversation_history: Optional[str] = None,
-                         tools: Optional[List] = None,
-                         tool_manager=None) -> str:
+    def generate_response(
+        self,
+        query: str,
+        conversation_history: Optional[str] = None,
+        tools: Optional[List] = None,
+        tool_manager=None,
+    ) -> str:
 
         # Check if we should search course content based on query keywords
         should_search = self._should_search_courses(query)
@@ -337,11 +392,17 @@ class LocalAIProvider(LLMProvider):
                 search_params = self._extract_search_parameters(query)
 
                 # Execute search with extracted parameters
-                search_results = tool_manager.execute_tool("search_course_content", **search_params)
+                search_results = tool_manager.execute_tool(
+                    "search_course_content", **search_params
+                )
                 if search_results and search_results.strip():
-                    search_context = f"\n\nRelevant course content found:\n{search_results}"
+                    search_context = (
+                        f"\n\nRelevant course content found:\n{search_results}"
+                    )
                 else:
-                    search_context = "\n\nNo relevant course content found for this query."
+                    search_context = (
+                        "\n\nNo relevant course content found for this query."
+                    )
             except Exception as e:
                 search_context = f"\n\nError searching course content: {str(e)}"
         else:
@@ -370,16 +431,18 @@ Provide only the direct answer to what was asked.{search_context}
         messages = [{"role": "system", "content": system_prompt}]
 
         if conversation_history:
-            messages.append({"role": "assistant", "content": f"Previous conversation:\n{conversation_history}"})
+            messages.append(
+                {
+                    "role": "assistant",
+                    "content": f"Previous conversation:\n{conversation_history}",
+                }
+            )
 
         messages.append({"role": "user", "content": query})
 
         try:
             response = self.client.chat.completions.create(
-                model=self.model,
-                messages=messages,
-                temperature=0,
-                max_tokens=800
+                model=self.model, messages=messages, temperature=0, max_tokens=800
             )
 
             return response.choices[0].message.content
@@ -395,8 +458,13 @@ Provide only the direct answer to what was asked.{search_context}
 
         # Strong indicators - always search
         strong_patterns = [
-            r'\bcourse\b', r'\blesson\b', r'\btutorial\b', r'\bmodule\b',
-            r'\bMCP\b', r'\bClaude\b', r'\bAnthropic\b'
+            r"\bcourse\b",
+            r"\blesson\b",
+            r"\btutorial\b",
+            r"\bmodule\b",
+            r"\bMCP\b",
+            r"\bClaude\b",
+            r"\bAnthropic\b",
         ]
 
         if any(re.search(pattern, query, re.IGNORECASE) for pattern in strong_patterns):
@@ -404,18 +472,35 @@ Provide only the direct answer to what was asked.{search_context}
 
         # Educational question patterns
         educational_patterns = [
-            'how to', 'what is', 'what are', 'explain', 'learn', 'teach',
-            'show me', 'tell me about', 'describe'
+            "how to",
+            "what is",
+            "what are",
+            "explain",
+            "learn",
+            "teach",
+            "show me",
+            "tell me about",
+            "describe",
         ]
 
         # Technical keywords
         tech_keywords = [
-            'api', 'programming', 'code', 'software', 'development',
-            'python', 'javascript', 'database', 'ml', 'ai'
+            "api",
+            "programming",
+            "code",
+            "software",
+            "development",
+            "python",
+            "javascript",
+            "database",
+            "ml",
+            "ai",
         ]
 
         # Search if educational pattern + tech keyword
-        has_educational = any(pattern in query_lower for pattern in educational_patterns)
+        has_educational = any(
+            pattern in query_lower for pattern in educational_patterns
+        )
         has_tech = any(keyword in query_lower for keyword in tech_keywords)
 
         return has_educational and has_tech
@@ -429,9 +514,9 @@ Provide only the direct answer to what was asked.{search_context}
         # Extract lesson number using regex
         # Patterns: "lesson 1", "lesson 2", "in lesson 3", etc.
         lesson_patterns = [
-            r'\blesson\s+(\d+)\b',
-            r'\bin\s+lesson\s+(\d+)\b',
-            r'\bof\s+lesson\s+(\d+)\b'
+            r"\blesson\s+(\d+)\b",
+            r"\bin\s+lesson\s+(\d+)\b",
+            r"\bof\s+lesson\s+(\d+)\b",
         ]
 
         for pattern in lesson_patterns:
@@ -443,10 +528,10 @@ Provide only the direct answer to what was asked.{search_context}
         # Extract course name using pattern matching
         # Patterns: "in the X course", "from X course", "about X course", etc.
         course_patterns = [
-            r'in\s+(?:the\s+)?([^?]+?)\s+course',
-            r'from\s+(?:the\s+)?([^?]+?)\s+course',
-            r'about\s+(?:the\s+)?([^?]+?)\s+course',
-            r'of\s+(?:the\s+)?([^?]+?)\s+course'
+            r"in\s+(?:the\s+)?([^?]+?)\s+course",
+            r"from\s+(?:the\s+)?([^?]+?)\s+course",
+            r"about\s+(?:the\s+)?([^?]+?)\s+course",
+            r"of\s+(?:the\s+)?([^?]+?)\s+course",
         ]
 
         for pattern in course_patterns:
@@ -454,7 +539,9 @@ Provide only the direct answer to what was asked.{search_context}
             if match:
                 course_name = match.group(1).strip()
                 # Clean up common words
-                course_name = re.sub(r'\s+(is|are|was|were)\s*$', '', course_name, flags=re.IGNORECASE)
+                course_name = re.sub(
+                    r"\s+(is|are|was|were)\s*$", "", course_name, flags=re.IGNORECASE
+                )
                 params["course_name"] = course_name
                 break
 
@@ -462,11 +549,11 @@ Provide only the direct answer to what was asked.{search_context}
         if "course_name" not in params:
             # Check for common course identifiers
             course_identifiers = [
-                r'\bMCP\b',
-                r'\bIntroduction\s+to\s+MCP\b',
-                r'\bAnthropic\b',
-                r'\bClaude\b',
-                r'\bBuilding\s+with\s+\w+\b'
+                r"\bMCP\b",
+                r"\bIntroduction\s+to\s+MCP\b",
+                r"\bAnthropic\b",
+                r"\bClaude\b",
+                r"\bBuilding\s+with\s+\w+\b",
             ]
 
             for pattern in course_identifiers:

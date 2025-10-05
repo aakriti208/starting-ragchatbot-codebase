@@ -2,15 +2,17 @@
 Tests for LLM providers to verify tool calling and integration
 This will expose the bug where Ollama/LocalAI don't properly handle tool parameters
 """
+
+from unittest.mock import MagicMock, Mock, patch
+
 import pytest
-from unittest.mock import Mock, MagicMock, patch
-from llm_provider import AnthropicProvider, OllamaProvider, LocalAIProvider
+from llm_provider import AnthropicProvider, LocalAIProvider, OllamaProvider
 
 
 class TestAnthropicProvider:
     """Test Anthropic provider tool calling"""
 
-    @patch('llm_provider.anthropic.Anthropic')
+    @patch("llm_provider.anthropic.Anthropic")
     def test_provider_initialization(self, mock_anthropic):
         """Test that Anthropic provider initializes correctly"""
         provider = AnthropicProvider(api_key="test-key", model="claude-3-sonnet")
@@ -19,7 +21,7 @@ class TestAnthropicProvider:
         assert provider.base_params["temperature"] == 0
         assert provider.base_params["max_tokens"] == 800
 
-    @patch('llm_provider.anthropic.Anthropic')
+    @patch("llm_provider.anthropic.Anthropic")
     def test_generate_response_without_tools(self, mock_anthropic):
         """Test basic response generation without tools"""
         # Mock the response
@@ -37,14 +39,17 @@ class TestAnthropicProvider:
         assert response == "This is a test response"
         mock_client.messages.create.assert_called_once()
 
-    @patch('llm_provider.anthropic.Anthropic')
+    @patch("llm_provider.anthropic.Anthropic")
     def test_generate_response_with_tool_use(self, mock_anthropic, tool_manager):
         """Test response generation with tool use"""
         # Mock initial response with tool use
         mock_tool_content = Mock()
         mock_tool_content.type = "tool_use"
         mock_tool_content.name = "search_course_content"
-        mock_tool_content.input = {"query": "What is MCP?", "course_name": "Introduction to MCP"}
+        mock_tool_content.input = {
+            "query": "What is MCP?",
+            "course_name": "Introduction to MCP",
+        }
         mock_tool_content.id = "tool_123"
 
         mock_initial_response = Mock()
@@ -56,7 +61,10 @@ class TestAnthropicProvider:
         mock_final_response.content = [Mock(text="MCP is Model Context Protocol")]
 
         mock_client = Mock()
-        mock_client.messages.create.side_effect = [mock_initial_response, mock_final_response]
+        mock_client.messages.create.side_effect = [
+            mock_initial_response,
+            mock_final_response,
+        ]
         mock_anthropic.return_value = mock_client
 
         provider = AnthropicProvider(api_key="test-key", model="claude-3-sonnet")
@@ -65,9 +73,7 @@ class TestAnthropicProvider:
         tools = tool_manager.get_tool_definitions()
 
         response = provider.generate_response(
-            query="What is MCP?",
-            tools=tools,
-            tool_manager=tool_manager
+            query="What is MCP?", tools=tools, tool_manager=tool_manager
         )
 
         # Should call API twice: once for initial, once for final
@@ -78,7 +84,7 @@ class TestAnthropicProvider:
 class TestOllamaProvider:
     """Test Ollama provider - THIS WILL EXPOSE THE BUG"""
 
-    @patch('openai.OpenAI')
+    @patch("openai.OpenAI")
     def test_provider_initialization(self, mock_openai):
         """Test that Ollama provider initializes correctly"""
         provider = OllamaProvider(base_url="http://localhost:11434", model="llama3.2")
@@ -86,7 +92,7 @@ class TestOllamaProvider:
         assert provider.model == "llama3.2"
         mock_openai.assert_called_once()
 
-    @patch('openai.OpenAI')
+    @patch("openai.OpenAI")
     def test_keyword_detection(self, mock_openai):
         """Test that _should_search_courses correctly identifies course-related queries"""
         provider = OllamaProvider()
@@ -102,11 +108,13 @@ class TestOllamaProvider:
         assert provider._should_search_courses("Explain Python programming") == True
 
         # Should not trigger search - no course/tech keywords
-        assert provider._should_search_courses("What is the capital of France?") == False
+        assert (
+            provider._should_search_courses("What is the capital of France?") == False
+        )
         assert provider._should_search_courses("Tell me a joke") == False
         assert provider._should_search_courses("What's the weather?") == False
 
-    @patch('openai.OpenAI')
+    @patch("openai.OpenAI")
     def test_generate_response_with_tool_manager(self, mock_openai, tool_manager):
         """Test Ollama provider with tool_manager - EXPOSES THE BUG"""
         # Mock OpenAI response
@@ -126,7 +134,7 @@ class TestOllamaProvider:
         response = provider.generate_response(
             query="What is MCP?",
             tools=tool_manager.get_tool_definitions(),
-            tool_manager=tool_manager
+            tool_manager=tool_manager,
         )
 
         # BUG: Ollama provider calls execute_tool with ONLY query parameter
@@ -142,7 +150,7 @@ class TestOllamaProvider:
         # assert "course_name" in call_args[1]  # This would fail
         # assert "lesson_number" in call_args[1]  # This would fail
 
-    @patch('openai.OpenAI')
+    @patch("openai.OpenAI")
     def test_ollama_ignores_tools_parameter(self, mock_openai, tool_manager):
         """Test that Ollama provider ignores the 'tools' parameter - BUG"""
         mock_response = Mock()
@@ -159,7 +167,7 @@ class TestOllamaProvider:
         provider.generate_response(
             query="What is MCP in lesson 1?",
             tools=tools,  # This parameter is IGNORED
-            tool_manager=tool_manager
+            tool_manager=tool_manager,
         )
 
         # Ollama doesn't use tools for extraction - it manually searches
@@ -170,15 +178,17 @@ class TestOllamaProvider:
 class TestLocalAIProvider:
     """Test LocalAI provider - same issues as Ollama"""
 
-    @patch('openai.OpenAI')
+    @patch("openai.OpenAI")
     def test_provider_initialization(self, mock_openai):
         """Test that LocalAI provider initializes correctly"""
-        provider = LocalAIProvider(base_url="http://localhost:8080", model="gpt-3.5-turbo")
+        provider = LocalAIProvider(
+            base_url="http://localhost:8080", model="gpt-3.5-turbo"
+        )
 
         assert provider.model == "gpt-3.5-turbo"
         mock_openai.assert_called_once()
 
-    @patch('openai.OpenAI')
+    @patch("openai.OpenAI")
     def test_localai_has_same_bug_as_ollama(self, mock_openai, tool_manager):
         """Test that LocalAI has the same bug as Ollama"""
         mock_response = Mock()
@@ -197,7 +207,7 @@ class TestLocalAIProvider:
         provider.generate_response(
             query="What is Claude in the Anthropic course?",
             tools=tool_manager.get_tool_definitions(),
-            tool_manager=tool_manager
+            tool_manager=tool_manager,
         )
 
         # Same bug: only query parameter is passed
@@ -238,7 +248,7 @@ class TestProviderComparison:
 class TestToolIntegrationBugs:
     """Tests that demonstrate the specific bugs in tool integration"""
 
-    @patch('openai.OpenAI')
+    @patch("openai.OpenAI")
     def test_ollama_extracts_course_name_parameter(self, mock_openai, tool_manager):
         """
         FIX VERIFIED: When user asks "What is MCP in the Introduction to MCP course?",
@@ -256,7 +266,7 @@ class TestToolIntegrationBugs:
 
         provider.generate_response(
             query="What is MCP in the Introduction to MCP course?",
-            tool_manager=tool_manager
+            tool_manager=tool_manager,
         )
 
         # FIX: course_name is now correctly extracted
@@ -265,7 +275,7 @@ class TestToolIntegrationBugs:
             assert "course_name" in call_kwargs
             assert call_kwargs["course_name"] == "Introduction to MCP"
 
-    @patch('openai.OpenAI')
+    @patch("openai.OpenAI")
     def test_ollama_extracts_lesson_number_parameter(self, mock_openai, tool_manager):
         """
         FIX VERIFIED: When user asks "What is covered in lesson 2?",
@@ -283,7 +293,7 @@ class TestToolIntegrationBugs:
 
         provider.generate_response(
             query="What is covered in lesson 2 of the MCP course?",
-            tool_manager=tool_manager
+            tool_manager=tool_manager,
         )
 
         # FIX: lesson_number is now correctly extracted

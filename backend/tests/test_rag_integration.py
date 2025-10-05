@@ -2,13 +2,14 @@
 End-to-end integration tests for the RAG system
 Tests the complete flow from query to response
 """
-import pytest
-from unittest.mock import Mock, patch, MagicMock
-import tempfile
-import shutil
 
-from rag_system import RAGSystem
+import shutil
+import tempfile
+from unittest.mock import MagicMock, Mock, patch
+
+import pytest
 from config import Config
+from rag_system import RAGSystem
 
 
 @pytest.fixture
@@ -34,7 +35,7 @@ def test_config():
 @pytest.fixture
 def rag_system_with_data(test_config, sample_course, sample_course_chunks):
     """Create a RAG system with test data loaded"""
-    with patch('openai.OpenAI') as mock_openai:
+    with patch("openai.OpenAI") as mock_openai:
         # Mock the OpenAI client
         mock_client = Mock()
         mock_response = Mock()
@@ -54,7 +55,7 @@ def rag_system_with_data(test_config, sample_course, sample_course_chunks):
 class TestRAGSystemInitialization:
     """Test RAG system initialization"""
 
-    @patch('openai.OpenAI')
+    @patch("openai.OpenAI")
     def test_rag_system_creates_components(self, mock_openai, test_config):
         """Test that RAG system initializes all components"""
         system = RAGSystem(test_config)
@@ -67,7 +68,7 @@ class TestRAGSystemInitialization:
         assert system.search_tool is not None
         assert system.outline_tool is not None
 
-    @patch('openai.OpenAI')
+    @patch("openai.OpenAI")
     def test_rag_system_registers_tools(self, mock_openai, test_config):
         """Test that RAG system registers search tools"""
         system = RAGSystem(test_config)
@@ -83,11 +84,13 @@ class TestRAGSystemInitialization:
 class TestRAGQueryFlow:
     """Test the complete query flow"""
 
-    @patch('openai.OpenAI')
+    @patch("openai.OpenAI")
     def test_query_without_session(self, mock_openai, rag_system_with_data):
         """Test querying without a session ID"""
         mock_response = Mock()
-        mock_response.choices = [Mock(message=Mock(content="MCP is Model Context Protocol"))]
+        mock_response.choices = [
+            Mock(message=Mock(content="MCP is Model Context Protocol"))
+        ]
         mock_openai.return_value.chat.completions.create.return_value = mock_response
 
         response, sources = rag_system_with_data.query("What is MCP?")
@@ -95,7 +98,7 @@ class TestRAGQueryFlow:
         assert isinstance(response, str)
         assert len(response) > 0
 
-    @patch('openai.OpenAI')
+    @patch("openai.OpenAI")
     def test_query_with_session(self, mock_openai, rag_system_with_data):
         """Test querying with session for conversation history"""
         mock_response = Mock()
@@ -108,11 +111,13 @@ class TestRAGQueryFlow:
         response2, _ = rag_system_with_data.query("Tell me more", session_id=session_id)
 
         # Check that session has history
-        history = rag_system_with_data.session_manager.get_conversation_history(session_id)
+        history = rag_system_with_data.session_manager.get_conversation_history(
+            session_id
+        )
         assert history is not None
         assert len(history) > 0
 
-    @patch('openai.OpenAI')
+    @patch("openai.OpenAI")
     def test_query_triggers_search(self, mock_openai, rag_system_with_data):
         """Test that course-related queries trigger search"""
         mock_response = Mock()
@@ -129,7 +134,7 @@ class TestRAGQueryFlow:
         # Check if keyword detection works
         assert rag_system_with_data.ai_generator._should_search_courses("What is MCP?")
 
-    @patch('openai.OpenAI')
+    @patch("openai.OpenAI")
     def test_sources_are_returned(self, mock_openai, rag_system_with_data):
         """Test that sources are returned from search"""
         mock_response = Mock()
@@ -146,7 +151,7 @@ class TestRAGQueryFlow:
 class TestRAGSystemBugDemonstration:
     """Tests that demonstrate the actual bug in the RAG system"""
 
-    @patch('openai.OpenAI')
+    @patch("openai.OpenAI")
     def test_course_specific_query_bug(self, mock_openai, rag_system_with_data):
         """
         BUG DEMONSTRATION: Course-specific queries don't extract course_name
@@ -179,7 +184,7 @@ class TestRAGSystemBugDemonstration:
             # The following would fail because course_name isn't extracted:
             # assert call_kwargs.get("course_name") == "Introduction to MCP"
 
-    @patch('openai.OpenAI')
+    @patch("openai.OpenAI")
     def test_lesson_specific_query_bug(self, mock_openai, rag_system_with_data):
         """
         BUG DEMONSTRATION: Lesson-specific queries don't extract lesson_number
@@ -210,12 +215,13 @@ class TestRAGSystemBugDemonstration:
 class TestCourseAddition:
     """Test adding courses to the RAG system"""
 
-    @patch('openai.OpenAI')
+    @patch("openai.OpenAI")
     def test_add_course_folder(self, mock_openai, test_config, tmp_path):
         """Test adding courses from a folder"""
         # Create a test course file
         course_file = tmp_path / "test_course.txt"
-        course_file.write_text("""Course Title: Test Course
+        course_file.write_text(
+            """Course Title: Test Course
 Course Link: https://example.com/test
 Course Instructor: Test Instructor
 
@@ -226,7 +232,8 @@ This is lesson 0 content.
 Lesson 1: Advanced Topics
 Lesson Link: https://example.com/lesson1
 This is lesson 1 content.
-""")
+"""
+        )
 
         system = RAGSystem(test_config)
         courses, chunks = system.add_course_folder(str(tmp_path))
@@ -239,7 +246,7 @@ This is lesson 1 content.
         assert analytics["total_courses"] == 1
         assert "Test Course" in analytics["course_titles"]
 
-    @patch('openai.OpenAI')
+    @patch("openai.OpenAI")
     def test_get_course_analytics(self, mock_openai, rag_system_with_data):
         """Test getting course analytics"""
         analytics = rag_system_with_data.get_course_analytics()
@@ -253,13 +260,15 @@ This is lesson 1 content.
 class TestErrorHandling:
     """Test error handling in the RAG system"""
 
-    @patch('openai.OpenAI')
+    @patch("openai.OpenAI")
     def test_query_with_empty_vector_store(self, mock_openai, test_config):
         """Test querying when vector store is empty"""
         system = RAGSystem(test_config)
 
         mock_response = Mock()
-        mock_response.choices = [Mock(message=Mock(content="I don't have information about that"))]
+        mock_response.choices = [
+            Mock(message=Mock(content="I don't have information about that"))
+        ]
         mock_openai.return_value.chat.completions.create.return_value = mock_response
 
         response, sources = system.query("What is MCP?")
@@ -268,11 +277,13 @@ class TestErrorHandling:
         assert isinstance(response, str)
         assert len(sources) == 0  # No sources because no courses
 
-    @patch('openai.OpenAI')
+    @patch("openai.OpenAI")
     def test_query_with_llm_error(self, mock_openai, rag_system_with_data):
         """Test handling of LLM errors"""
         # Mock an error
-        mock_openai.return_value.chat.completions.create.side_effect = Exception("Connection error")
+        mock_openai.return_value.chat.completions.create.side_effect = Exception(
+            "Connection error"
+        )
 
         response, sources = rag_system_with_data.query("What is MCP?")
 

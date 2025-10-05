@@ -19,6 +19,11 @@ uv run python main.py      # Run any Python script
 uv add package_name        # Add new dependencies
 uv remove package_name     # Remove dependencies
 
+# Code quality tools
+./fix.sh                   # Auto-format code with Black and isort
+./lint.sh                  # Run all quality checks (flake8, mypy, Black, isort)
+./format.sh                # Check formatting without applying changes
+
 # Access points
 # Web Interface: http://localhost:8000
 # API Documentation: http://localhost:8000/docs
@@ -113,3 +118,25 @@ Lesson 1: [next title]
 - `add_course_folder()` supports selective file processing via `selected_files` parameter
 - Graceful handling of malformed documents with fallback to filename as course title
 - Support for PDF, DOCX, and TXT file formats
+
+## Code Quality Standards
+
+**Formatting & Style:**
+- **Black**: Automatic code formatting (88 char line length)
+- **isort**: Import sorting compatible with Black
+- **flake8**: Linting with Black-compatible settings (E203, W503 ignored)
+- **mypy**: Type checking (permissive mode, ignore missing imports)
+
+**Quality Scripts:**
+- `./fix.sh`: Auto-format all code (isort + Black)
+- `./lint.sh`: Run all checks (flake8, mypy, isort, Black)
+- `./format.sh`: Check formatting without changes
+
+**Configuration Files:**
+- `pyproject.toml`: Tool settings for Black, isort, and mypy
+- `.flake8`: Flake8 configuration with exclusions
+
+**Pre-commit Workflow:**
+1. Run `./fix.sh` to format code before committing
+2. Run `./lint.sh` to verify all checks pass
+3. All Python code in `backend/` must pass quality checks
