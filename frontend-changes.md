@@ -1,6 +1,32 @@
-# Frontend Changes - Theme Toggle Feature
+# Frontend Changes
 
-## Summary
+## Latest Changes - Header Cleanup (Issue #2)
+
+### Summary
+Removed the header title and subtitle to create a cleaner, more minimal UI. The theme toggle button remains in the top-right corner as the only header element.
+
+### Files Modified
+1. **`frontend/index.html`**
+   - Removed `<h1>Course Materials Assistant</h1>`
+   - Removed `<p class="subtitle">Ask questions about courses, instructors, and content</p>`
+   - Removed `.header-content` wrapper div
+   - Kept theme toggle button in header
+
+2. **`frontend/style.css`**
+   - Updated header `justify-content` from `space-between` to `flex-end` (align toggle to right)
+   - Removed `border-bottom: 1px solid var(--border-color)` from header
+   - Reduced header padding from `1.5rem 2rem` to `1rem 2rem`
+
+### Result
+- Cleaner, more minimal header with only theme toggle visible
+- No horizontal divider line below header
+- More screen space for chat content
+
+---
+
+## Previous Changes - Theme Toggle Feature
+
+### Summary
 Implemented a dark/light theme toggle feature that allows users to switch between dark and light color schemes with smooth transitions. The theme preference is persisted in localStorage for a consistent experience across sessions.
 
 ## Files Modified
